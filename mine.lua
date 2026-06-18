@@ -10,13 +10,51 @@ local Workspace = game:GetService("Workspace")
 local player = Players.LocalPlayer
 local configFileName = "mine_a_mountain_advanced_config.json"
 
--- Pastikan Rayfield UI library tersedia. Jika tidak, pesan error akan dicetak.
-local loaded, Rayfield = pcall(function()
-    return loadstring(game:HttpGet("https://raw.githubusercontent.com/shlexware/Rayfield/main/source.lua"))()
-end)
+-- Pastikan Rayfield UI library tersedia. Gunakan beberapa metode HTTP loader agar lebih kompatibel dengan executor.
+local function fetchRemoteSource(url)
+    local loaders = {
+        function()
+            if game.HttpGet then
+                return game:HttpGet(url)
+            end
+        end,
+        function()
+            if game.HttpGetAsync then
+                return game:HttpGetAsync(url)
+            end
+        end,
+        function()
+            return HttpService:GetAsync(url)
+        end,
+        function()
+            local requestFunc = syn and syn.request or http_request or request
+            if requestFunc then
+                return requestFunc({Url = url, Method = "GET"}).Body
+            end
+        end,
+    }
+
+    for _, loader in ipairs(loaders) do
+        local success, result = pcall(loader)
+        if success and result and type(result) == "string" and #result > 0 then
+            return result
+        end
+    end
+    return nil
+end
+
+local rayfieldUrl = "https://raw.githubusercontent.com/shlexware/Rayfield/main/source.lua"
+local rayfieldSource = fetchRemoteSource(rayfieldUrl)
+
+local loaded, Rayfield = false, nil
+if rayfieldSource then
+    loaded, Rayfield = pcall(function()
+        return loadstring(rayfieldSource)()
+    end)
+end
 
 if not loaded or not Rayfield then
-    warn("[Mine a Mountain] Gagal memuat Rayfield UI. Pastikan executor Anda mengizinkan HttpGet.")
+    warn("[Mine a Mountain] Gagal memuat Rayfield UI. Coba izinkan HTTP di executor atau gunakan executor dengan akses HttpGet/HttpGetAsync.")
     return
 end
 
